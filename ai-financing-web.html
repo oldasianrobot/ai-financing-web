@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Financing Web (Interactive)</title>
+  <style>
+    :root {
+      --color-equity: #7aa2ff;
+      --color-compute: #9ece6a;
+      --color-chips: #ff9e64;
+      --color-debt: #f7768e;
+      --color-engineering: #bb9af7;
+      --color-leases: #7dcfff;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #0b0d12;
+      color: #e7e7e7;
+    }
+
+    header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #1c2230;
+      background: #0f121a;
+    }
+
+    header h1 {
+      margin: 0 0 6px 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    header .sub {
+      font-size: 12px;
+      color: #b9c0d0;
+      line-height: 1.35;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 16px;
+      border-bottom: 1px solid #1c2230;
+      background: #0f121a;
+    }
+
+    button {
+      cursor: pointer;
+      border: 1px solid #26314a;
+      background: #141a26;
+      color: #e7e7e7;
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
+    button.active {
+      border-color: #7aa2ff;
+      box-shadow: 0 0 0 2px rgba(122, 162, 255, 0.15) inset;
+    }
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 0;
+      height: calc(100vh - 114px);
+    }
+
+    #viz {
+      position: relative;
+    }
+
+    aside {
+      border-left: 1px solid #1c2230;
+      background: #0f121a;
+      padding: 12px 14px;
+      overflow: auto;
+    }
+
+    aside h2 {
+      margin: 0 0 10px 0;
+      font-size: 13px;
+    }
+
+    .card {
+      border: 1px solid #1c2230;
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #0b0d12;
+    }
+
+    .k {
+      color: #b9c0d0;
+      font-size: 11px;
+    }
+
+    .v {
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .legend {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    a {
+      color: #7aa2ff;
+      text-decoration: none;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .link {
+      stroke-opacity: 0.35;
+    }
+
+    .link.dim {
+      stroke-opacity: 0.06;
+    }
+
+    .link.hl {
+      stroke-opacity: 0.9;
+    }
+
+    .node circle {
+      stroke: rgba(255, 255, 255, 0.25);
+      stroke-width: 1px;
+    }
+
+    .node text {
+      font-size: 11px;
+      fill: #e7e7e7;
+      paint-order: stroke;
+      stroke: rgba(0, 0, 0, 0.55);
+      stroke-width: 3px;
+    }
+
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(15, 18, 26, 0.95);
+      border: 1px solid #26314a;
+      color: #e7e7e7;
+      padding: 10px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      max-width: 290px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .tooltip.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .tip-k {
+      color: #b9c0d0;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .tip-v {
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 980px) {
+      .wrap {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      aside {
+        border-left: none;
+        border-top: 1px solid #1c2230;
+        height: 38vh;
+      }
+
+      #viz {
+        height: 62vh;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>AI Financing Web (Interactive)</h1>
+    <div class="sub">
+      Interactive map of the intertwined AI financing ecosystem. Hover nodes to spotlight relationships, drag to
+      rearrange the web.
+      Bubble size approximates market cap or valuation (USD billions) to encode power.
+    </div>
+  </header>
+
+  <div class="controls" id="controls">
+    <button data-filter="ALL" class="active" aria-pressed="true">All links</button>
+    <button data-filter="Equity" aria-pressed="false">Equity / Investment</button>
+    <button data-filter="Compute" aria-pressed="false">Compute purchase</button>
+    <button data-filter="Chips" aria-pressed="false">Chip supply loop</button>
+    <button data-filter="Debt" aria-pressed="false">Debt / Private credit</button>
+    <button data-filter="Engineering" aria-pressed="false">Financial engineering (SPV / ABS / GPU-backed)</button>
+    <button data-filter="Leases" aria-pressed="false">Leases</button>
+  </div>
+
+  <main class="wrap">
+    <div id="viz">
+      <div class="tooltip" id="tt"></div>
+      <svg id="svg" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid meet"
+        aria-label="Interactive graph of AI financing companies and connections"></svg>
+    </div>
+
+    <aside>
+      <h2>What you are looking at</h2>
+
+      <div class="card">
+        <div class="k">Encoding power</div>
+        <div class="v">
+          Bubble area reflects an approximate proxy for power: market cap for public companies, valuation for private
+          companies.
+          Values are in USD billions and are intentionally rough. This is a structural map, not a forensic accounting
+          audit.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="k">Legend (relationship types)</div>
+        <div class="legend">
+          <div><span class="dot" style="background:var(--color-equity)"></span><span class="v">Equity /
+              Investment</span></div>
+          <div><span class="dot" style="background:var(--color-compute)"></span><span class="v">Compute purchase</span>
+          </div>
+          <div><span class="dot" style="background:var(--color-chips)"></span><span class="v">Chip supply loop</span>
+          </div>
+          <div><span class="dot" style="background:var(--color-debt)"></span><span class="v">Debt / Private
+              credit</span></div>
+          <div><span class="dot" style="background:var(--color-engineering)"></span><span class="v">Financial
+              engineering</span></div>
+          <div><span class="dot" style="background:var(--color-leases)"></span><span class="v">Leases</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="k">Tip</div>
+        <div class="v">
+          Hover a node to spotlight its edges. Drag nodes to reduce clutter. Click filters to isolate one relationship
+          type.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="k">Source</div>
+        <div class="v">
+          Rogé Karma. "<a href="https://www.theatlantic.com/economy/2025/12/nvidia-ai-financing-deals/685197/"
+            target="_blank" rel="noopener noreferrer">Something Ominous Is Happening in the AI Economy</a>." <i>The
+            Atlantic</i>, December 10, 2025.
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script>
+    /*
+      Nodes:
+      - value is in USD billions.
+      - For public companies: market cap.
+      - For private companies: valuation.
+      - For instruments/concepts: small placeholders so they do not dominate.
+    */
+    const nodes = [
+      { id: "Nvidia", group: "Company", value: 4630, note: "Central chip supplier; also invests in AI firms to keep demand for its chips flowing." },
+      { id: "Microsoft", group: "Company", value: 3625, note: "Major CoreWeave customer; deeply linked with OpenAI." },
+      { id: "Amazon", group: "Company", value: 2486, note: "Cloud provider; reported compute sales to OpenAI." },
+      { id: "Meta", group: "Company", value: 1672, note: "Reported deal with CoreWeave; also cited using SPV-style financing for a data center project." },
+      { id: "Oracle", group: "Company", value: 569, note: "Cloud provider; reported compute sales to OpenAI." },
+
+      { id: "OpenAI", group: "Company", value: 500, note: "Major buyer of compute; valuation is a baseline estimate used for visualization." },
+      { id: "Anthropic", group: "Company", value: 183, note: "AI lab; valuation is a baseline estimate used for visualization." },
+      { id: "CoreWeave", group: "Company", value: 37, note: "Data-center operator; high leverage and circular customer relationships." },
+
+      { id: "Private Credit", group: "Finance", value: 60, note: "Lightly regulated lending; large and growing exposure to AI infrastructure." },
+      { id: "Private Equity", group: "Finance", value: 60, note: "Often the origin of private credit deals; involved in data-center lending." },
+      { id: "Investors", group: "Finance", value: 60, note: "Institutional investors exposed via private credit and structured products." },
+
+      { id: "SPV", group: "Instrument", value: 12, note: "Special-purpose vehicles used to borrow/build and keep debt off balance sheets." },
+      { id: "ABS", group: "Instrument", value: 12, note: "Asset-backed securities used to slice and sell data-center debt to investors." },
+      { id: "GPU-backed loans", group: "Instrument", value: 12, note: "Loans collateralized by GPUs; risk if chip values fall." },
+
+      { id: "GPUs", group: "Asset", value: 18, note: "Compute hardware; collateral value can fall when newer models release." },
+      { id: "Data Centers", group: "Asset", value: 18, note: "Physical infrastructure financed via debt and engineered vehicles." }
+    ];
+
+    const links = [
+      // Chip supply loop
+      { source: "Nvidia", target: "GPUs", type: "Chips", label: "Supplies chips" },
+      { source: "CoreWeave", target: "Nvidia", type: "Chips", label: "Buys Nvidia chips" },
+      { source: "CoreWeave", target: "GPUs", type: "Chips", label: "Holds GPUs as assets" },
+
+      // Compute purchase
+      { source: "CoreWeave", target: "OpenAI", type: "Compute", label: "Compute deal (reported $22B)" },
+      { source: "Oracle", target: "OpenAI", type: "Compute", label: "Compute purchase (reported $300B)" },
+      { source: "Amazon", target: "OpenAI", type: "Compute", label: "Compute purchase (reported $38B)" },
+
+      // CoreWeave customers + overlap
+      { source: "Microsoft", target: "CoreWeave", type: "Compute", label: "Major customer (reported up to 70% rev)" },
+      { source: "Nvidia", target: "CoreWeave", type: "Compute", label: "Customer + rents compute back" },
+      { source: "OpenAI", target: "CoreWeave", type: "Equity", label: "Investor (reported)" },
+      { source: "Nvidia", target: "CoreWeave", type: "Equity", label: "Investor (reported)" },
+
+      // Nvidia equity/investment links
+      { source: "Nvidia", target: "OpenAI", type: "Equity", label: "Investment (reported $100B)" },
+      { source: "Microsoft", target: "Anthropic", type: "Equity", label: "Co-investment (reported, with Nvidia)" },
+      { source: "Nvidia", target: "Anthropic", type: "Equity", label: "Investment (reported $15B with Microsoft)" },
+
+      // Debt and financial engineering
+      { source: "Private Credit", target: "CoreWeave", type: "Debt", label: "High-interest lending (reported)" },
+      { source: "Private Equity", target: "Private Credit", type: "Debt", label: "Originates / manages private credit" },
+      { source: "SPV", target: "Data Centers", type: "Engineering", label: "SPV builds/owns then leases" },
+      { source: "Private Equity", target: "SPV", type: "Engineering", label: "Sets up SPVs (reported)" },
+      { source: "ABS", target: "Investors", type: "Engineering", label: "Sells structured debt exposure" },
+      { source: "Data Centers", target: "ABS", type: "Engineering", label: "Debt packaged into ABS" },
+      { source: "GPU-backed loans", target: "CoreWeave", type: "Engineering", label: "Loans collateralized by GPUs" },
+      { source: "GPUs", target: "GPU-backed loans", type: "Engineering", label: "Collateral value risk" },
+      { source: "Private Credit", target: "Investors", type: "Debt", label: "Capital supplied by institutions" },
+
+      // Leases
+      { source: "CoreWeave", target: "Data Centers", type: "Leases", label: "Leases / builds capacity" },
+      { source: "Data Centers", target: "CoreWeave", type: "Leases", label: "Lease obligations (reported large through 2028)" },
+
+      // Meta example (kept conceptual)
+      { source: "Meta", target: "SPV", type: "Engineering", label: "Data center financing via SPV (reported)" },
+      { source: "Meta", target: "CoreWeave", type: "Compute", label: "Reported deal (large multi-year)" }
+    ];
+
+    const typeColor = new Map([
+      ["Equity", "var(--color-equity)"],
+      ["Compute", "var(--color-compute)"],
+      ["Chips", "var(--color-chips)"],
+      ["Debt", "var(--color-debt)"],
+      ["Engineering", "var(--color-engineering)"],
+      ["Leases", "var(--color-leases)"]
+    ]);
+
+    const svg = d3.select("#svg");
+    const g = svg.append("g");
+
+    // Zoom/pan
+    const zoomBehavior = d3.zoom().scaleExtent([0.35, 2.5]).on("zoom", (event) => {
+      g.attr("transform", event.transform);
+      // Reveal sub-trillion values if zoomed in past 1.2
+      const isZoomed = event.transform.k > 1.2;
+      d3.selectAll(".node-val").style("opacity", d => {
+        if (!d.value) return 0;
+        if (d.value >= 1000) return 1; // Always show trillions
+        return isZoomed ? 1 : 0; // Show billions only when zoomed
+      });
+    });
+    svg.call(zoomBehavior);
+
+    // ---- Bubble sizing: sqrt scale so area roughly matches value, without making Nvidia a black hole ----
+    const valued = nodes.filter(d => typeof d.value === "number" && !Number.isNaN(d.value));
+    const rScale = d3.scaleSqrt()
+      .domain(d3.extent(valued, d => d.value))
+      .range([10, 54]); // adjust max radius here
+
+    const radiusFor = (d) => (d.value ? rScale(d.value) : 14);
+
+    const link = g.append("g")
+      .attr("stroke-width", 2)
+      .selectAll("line")
+      .data(links)
+      .join("line")
+      .attr("class", "link")
+      .attr("stroke", d => typeColor.get(d.type) || "#999");
+
+    const node = g.append("g")
+      .selectAll("g")
+      .data(nodes)
+      .join("g")
+      .attr("class", "node")
+      .call(d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended)
+      );
+
+    node.append("circle")
+      .attr("r", d => radiusFor(d))
+      .attr("fill", d => {
+        if (d.group === "Company") return "#1b2a4a";
+        if (d.group === "Finance") return "#2a1b2c";
+        if (d.group === "Instrument") return "#2a2438";
+        if (d.group === "Asset") return "#1f2b24";
+        return "#222";
+      });
+
+    node.append("text")
+      .attr("x", d => radiusFor(d) + 6)
+      .attr("y", -2)
+      .text(d => d.id);
+
+    function formatValue(d) {
+      if (!d.value) return "";
+      if (d.value >= 1000) return `$${(d.value / 1000).toFixed(1)}T`;
+      return `$${d.value.toFixed(0)}B`;
+    }
+
+    node.append("text")
+      .attr("class", "node-val")
+      .attr("x", d => radiusFor(d) + 6)
+      .attr("y", 12)
+      .style("font-size", "10px")
+      .style("fill", "#b9c0d0")
+      .style("opacity", d => (d.value && d.value >= 1000) ? 1 : 0) // Default state
+      .style("transition", "opacity 0.2s ease")
+      .text(d => formatValue(d));
+
+    const tt = document.getElementById("tt");
+
+    node.on("mouseenter", (event, d) => {
+      highlight(d.id);
+      showTip(event, d);
+    }).on("mousemove", (event) => {
+      moveTip(event);
+    }).on("mouseleave", () => {
+      unhighlight();
+      hideTip();
+    });
+
+    link.on("mouseenter", (event, d) => {
+      link.classed("dim", true).classed("hl", false);
+      d3.select(event.currentTarget).classed("dim", false).classed("hl", true);
+      showLinkTip(event, d);
+    }).on("mousemove", (event) => moveTip(event))
+      .on("mouseleave", () => {
+        unhighlight();
+        hideTip();
+      });
+
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d => d.id).distance(165).strength(0.9))
+      .force("charge", d3.forceManyBody().strength(-560))
+      .force("center", d3.forceCenter(600, 350))
+      .force("collide", d3.forceCollide().radius(d => radiusFor(d) + 10));
+
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.25).restart();
+      d.fx = d.x; d.fy = d.y;
+    }
+    function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null; d.fy = null;
+    }
+
+    function connectedEdges(nodeId) {
+      return links.filter(l => l.source.id === nodeId || l.target.id === nodeId);
+    }
+
+    function highlight(nodeId) {
+      const edges = new Set(connectedEdges(nodeId));
+      link.classed("dim", d => !edges.has(d)).classed("hl", d => edges.has(d));
+    }
+
+    function unhighlight() {
+      link.classed("dim", false).classed("hl", false);
+    }
+
+    // formatValue function moved up for node rendering dependency
+
+    function showTip(event, d) {
+      const val = formatValue(d);
+      tt.innerHTML = `
+        <div class="tip-k">${escapeHtml(d.group)}${val ? " · " + escapeHtml(val) : ""}</div>
+        <div class="tip-v"><b>${escapeHtml(d.id)}</b><br>${escapeHtml(d.note || "")}</div>
+      `;
+      tt.classList.add("show");
+      moveTip(event);
+    }
+
+    function showLinkTip(event, d) {
+      tt.innerHTML = `
+        <div class="tip-k">${escapeHtml(d.type)}</div>
+        <div class="tip-v"><b>${escapeHtml(d.source.id)} → ${escapeHtml(d.target.id)}</b><br>${escapeHtml(d.label || "")}</div>
+      `;
+      tt.classList.add("show");
+      moveTip(event);
+    }
+
+    function moveTip(event) {
+      const bounds = document.getElementById("viz").getBoundingClientRect();
+      const x = event.clientX - bounds.left + 14;
+      const y = event.clientY - bounds.top + 14;
+      tt.style.left = x + "px";
+      tt.style.top = y + "px";
+    }
+
+    function hideTip() {
+      tt.classList.remove("show");
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    // Filtering
+    const controls = document.getElementById("controls");
+    controls.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const filter = btn.dataset.filter;
+
+      [...controls.querySelectorAll("button")].forEach(b => {
+        b.classList.remove("active");
+        b.setAttribute("aria-pressed", "false");
+      });
+      btn.classList.add("active");
+      btn.setAttribute("aria-pressed", "true");
+
+      link.attr("display", d => (filter === "ALL" || d.type === filter) ? null : "none");
+    });
+  </script>
+</body>
+
+</html>
